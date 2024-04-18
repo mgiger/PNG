@@ -48,8 +48,8 @@ export class PNG {
 			imageDataChunk,
 			new PNGChunk(0x49454e44), // IEND
 		]
-		const blocks: Uint8Array[] = chunks.map(c => this.chunkData(c))
-		const length = blocks.reduce((acc, block) => acc + block.length, 0)
+		const cdata: Uint8Array[] = chunks.map(c => c.chunkData)
+		const length = cdata.reduce((acc, block) => acc + block.length, 0)
 
 		const block = new Uint8Array(length + 8)
 		const data = new DataView(block.buffer)
@@ -57,32 +57,35 @@ export class PNG {
 		data.setUint32(4, 0x0d0a1a0a) // DOS line ending
 
 		let offset = 8
-		for(const b of blocks) {
-			block.set(b, offset)
-			offset += b.length
+		for(const d of cdata) {
+			block.set(d, offset)
+			offset += d.length
 		}
 
-		return block
-	}
-
-	private chunkData(chunk: PNGChunk): Uint8Array {
-		const block = new Uint8Array(chunk.length + 12)
-		const data = new DataView(block.buffer)
-		data.setUint32(0, chunk.length)
-		data.setUint32(4, chunk.type)
-
-		block.set(chunk.data, 8)
-
-		const crc = crc32(0, block, chunk.length + 4, 4)
-		data.setUint32(8 + chunk.length, crc)
 		return block
 	}
 }
 
 class PNGChunk {
+	public type: number
 	public data = new Uint8Array(0)
-	constructor(public type: number) {}
-	public get length(): number { return this.data.length }
+
+	constructor(type: number) {
+		this.type = type
+	}
+
+	public get chunkData(): Uint8Array {
+		const block = new Uint8Array(this.data.length + 12)
+		const data = new DataView(block.buffer)
+		data.setUint32(0, this.data.length)
+		data.setUint32(4, this.type)
+
+		block.set(this.data, 8)
+
+		const crc = crc32(0, block, this.data.length + 4, 4)
+		data.setUint32(8 + this.data.length, crc)
+		return block
+	}
 }
 
 class IHDR extends PNGChunk {
