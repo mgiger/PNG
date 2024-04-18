@@ -138,7 +138,7 @@ class IDAT extends PNGChunk {
 			filterData.set(imgData.subarray(i * byteWidth, (i + 1) * byteWidth), i * rowWidth + 1)
 		}
 
-        this.data = deflateSync(filterData, {level: compression, windowBits: 15, strategy: 3})
+		this.data = deflateSync(filterData, {level: compression, windowBits: 15, strategy: 3})
 	}
 }
 
