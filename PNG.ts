@@ -37,9 +37,9 @@ export class PNG {
 		this.colorType = colorType
 	}
 
-	public async compress(imgData: Uint8Array, compression: PNGCompression = PNGCompression.BestSpeed): Promise<Uint8Array> {
+	public compress(imgData: Uint8Array, compression: PNGCompression = PNGCompression.BestSpeed): Uint8Array {
 		const imageDataChunk = new IDAT(this.width, this.height, this.bitDepth)
-		await imageDataChunk.compress(imgData, compression)
+		imageDataChunk.compress(imgData, compression)
 
 		// add whatever chunks you want here right before the IEND chunk
 		const chunks: PNGChunk[] = [
@@ -128,7 +128,7 @@ class IDAT extends PNGChunk {
 		this.bitDepth = bitDepth
 	}
 
-	public async compress(imgData: Uint8Array, compression: PNGCompression): Promise<void> {
+	public compress(imgData: Uint8Array, compression: PNGCompression): void {
 		const filterType = 0	// Add filtering here
 		const byteWidth = Math.ceil(this.width * this.bitDepth / 8)
 		const rowWidth = byteWidth + 1
