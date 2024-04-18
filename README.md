@@ -1,6 +1,6 @@
-# PNG
+# ts-png
 
-Simple Typescript PNG creation class.
+Simple Typescript .png format creation class.
 
 Just paste this class into your code and you're living large.
 
