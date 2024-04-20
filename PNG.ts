@@ -5,7 +5,7 @@
 /// Copyright (c) 2024 Geodata Labs
 ///
 
-import { deflateSync } from "zlib"
+import { deflateSync, inflateSync } from "zlib"
 
 export enum PNGColorType {
 	Greyscale = 0,
@@ -29,12 +29,17 @@ export class PNG {
 	public height: number
 	public bitDepth: PNGBitDepth
 	public colorType: PNGColorType
+	protected pngChunks: PNGChunk[] = []
 
-	constructor(width: number, height: number, bitDepth: PNGBitDepth, colorType: PNGColorType) {
+	constructor(width: number = 0, height: number = 0, bitDepth: PNGBitDepth = 8, colorType: PNGColorType = PNGColorType.Truecolour) {
 		this.width = width
 		this.height = height
 		this.bitDepth = bitDepth
 		this.colorType = colorType
+	}
+
+	public addChunk(chunk: PNGChunk): void {
+		this.pngChunks.push(chunk)
 	}
 
 	public compress(imgData: Uint8Array, compression: PNGCompression = PNGCompression.BestSpeed): Uint8Array {
@@ -42,12 +47,14 @@ export class PNG {
 		imageDataChunk.compress(imgData, compression)
 
 		// add whatever chunks you want here right before the IEND chunk
-		const chunks: PNGChunk[] = [
+		const chunks = [
 			new IHDR(this.width, this.height, this.bitDepth, this.colorType),
 			new PLTE(),
 			imageDataChunk,
-			new PNGChunk(0x49454e44), // IEND
 		]
+		chunks.push(...this.pngChunks)
+		chunks.push(new PNGChunk(0x49454e44)) // IEND
+
 		const cdata: Uint8Array[] = chunks.map(c => c.chunkData)
 		const length = cdata.reduce((acc, block) => acc + block.length, 0)
 
@@ -64,9 +71,53 @@ export class PNG {
 
 		return block
 	}
+
+	public decompress(imgData: Uint8Array): Uint8Array | undefined {
+		const view = new DataView(imgData.buffer)
+		if(view.getUint32(0) !== 0x89504e47 || view.getUint32(4) !== 0x0d0a1a0a) {
+			return undefined
+		}
+
+		let offset = 8
+		let imageData: Uint8Array | undefined = undefined
+		while(offset < imgData.length) {
+			const length = view.getUint32(offset)
+			const type = view.getUint32(offset + 4)
+			const chunk = new Uint8Array(imgData.buffer, offset + 8, length)
+			const crc = view.getUint32(offset + 8 + length)
+
+			switch(type) {
+				case 0x49484452: // IHDR
+					const ihdr = new DataView(chunk.buffer)
+					this.width = ihdr.getUint32(0)
+					this.height = ihdr.getUint32(4)
+					this.bitDepth = ihdr.getUint8(8) as PNGBitDepth
+					this.colorType = ihdr.getUint8(9)
+					break
+
+				case 0x49444154: // IDAT
+					// decompress the data (assume we have width, height, and bitDepth)
+					const chunkData = inflateSync(chunk)
+					const byteWidth = Math.ceil(this.width * this.bitDepth / 8)
+					const rowWidth = byteWidth + 1
+					const imageData = new Uint8Array(this.width * this.height)
+					for(let i=0; i<this.height; i++) {
+						imageData.set(chunkData.subarray(i * rowWidth + 1, (i + 1) * rowWidth), i * byteWidth)
+					}
+					break
+
+				case 0x49454e44: // IEND
+					break
+			}
+
+			offset += 12 + length
+		}
+
+		return imageData
+	}
 }
 
-class PNGChunk {
+export class PNGChunk {
 	public type: number
 	public data = new Uint8Array(0)
 
